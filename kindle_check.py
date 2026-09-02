@@ -67,6 +67,7 @@ def search_kindle(query: str) -> str | None:
     try:
         resp = requests.get(url, params=params, headers=HEADERS, timeout=20)
         resp.raise_for_status()
+        log(f"  → HTTPステータス: {resp.status_code}, サイズ: {len(resp.text)} bytes")
         return resp.text
     except Exception as e:
         log(f"検索エラー '{query}': {e}")
@@ -74,7 +75,6 @@ def search_kindle(query: str) -> str | None:
 
 
 def parse_price(text: str) -> int | None:
-    """'￥1,234' や '1,234円' などをパースして整数を返す"""
     cleaned = text.replace("￥", "").replace(",", "").replace("円", "").strip()
     try:
         return int(cleaned)
@@ -84,9 +84,17 @@ def parse_price(text: str) -> int | None:
 
 def parse_search_results(html: str) -> list[dict]:
     soup = BeautifulSoup(html, "html.parser")
-    books = []
 
-    for item in soup.select('[data-component-type="s-search-result"]'):
+    # ブロック検知
+    if "api-services-support@amazon.com" in html or "Enter the characters you see below" in html:
+        log("  ⚠ Amazon によるアクセス制限を検出")
+        return []
+
+    results = soup.select('[data-component-type="s-search-result"]')
+    log(f"  → 検索結果要素数: {len(results)}")
+
+    books = []
+    for item in results:
         try:
             asin = item.get("data-asin", "").strip()
             if not asin:
@@ -95,7 +103,6 @@ def parse_search_results(html: str) -> list[dict]:
             title_el = item.select_one("h2 a span")
             title = title_el.text.strip() if title_el else "不明"
 
-            # 現在価格
             price_el = item.select_one(".a-price .a-offscreen")
             if not price_el:
                 continue
@@ -103,7 +110,6 @@ def parse_search_results(html: str) -> list[dict]:
             if price is None:
                 continue
 
-            # 参考価格（割引前の価格）
             orig_price = None
             for orig_el in item.select(".a-text-price .a-offscreen"):
                 orig = parse_price(orig_el.text)
@@ -111,7 +117,6 @@ def parse_search_results(html: str) -> list[dict]:
                     orig_price = orig
                     break
 
-            # 割引率バッジ（例: "-50%"）
             discount_pct = None
             badge_el = item.select_one(".savingsPercentage")
             if badge_el:
@@ -124,16 +129,14 @@ def parse_search_results(html: str) -> list[dict]:
             if discount_pct is None and orig_price and orig_price > 0:
                 discount_pct = int((1 - price / orig_price) * 100)
 
-            books.append(
-                {
-                    "asin": asin,
-                    "title": title,
-                    "price": price,
-                    "orig_price": orig_price,
-                    "discount_pct": discount_pct,
-                    "url": f"https://www.amazon.co.jp/dp/{asin}",
-                }
-            )
+            books.append({
+                "asin": asin,
+                "title": title,
+                "price": price,
+                "orig_price": orig_price,
+                "discount_pct": discount_pct,
+                "url": f"https://www.amazon.co.jp/dp/{asin}",
+            })
         except Exception:
             continue
 
@@ -186,7 +189,6 @@ def build_message(sale_books: list[dict]) -> str:
 def check_sales():
     config = load_config()
 
-    # GitHub Secrets (環境変数) を優先、なければ config.json を使用
     line_token = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN") or config.get("line_channel_access_token", "")
     line_user_id = os.environ.get("LINE_USER_ID") or config.get("line_user_id", "")
     min_discount = config.get("min_discount_pct", 50)
@@ -201,6 +203,7 @@ def check_sales():
         return
 
     cache = load_cache()
+    today = datetime.now().strftime("%Y-%m-%d")
     sale_books = []
 
     for query, query_type in queries:
@@ -210,27 +213,44 @@ def check_sales():
             continue
 
         books = parse_search_results(html)
-        log(f"  → {len(books)} 件取得")
 
         for book in books:
-            disc = book.get("discount_pct")
-            if disc is None or disc < min_discount:
-                continue
-
             asin = book["asin"]
-            # 同じ価格で通知済みならスキップ
-            cached = cache.get(asin, {})
-            if cached.get("notified_price") == book["price"]:
-                continue
-
-            sale_books.append({"query": query, **book})
-            cache[asin] = {
-                "notified_price": book["price"],
-                "notified_at": datetime.now().isoformat(),
+            entry = cache.setdefault(asin, {
                 "title": book["title"],
-            }
+                "url": book["url"],
+                "query": query,
+                "history": [],
+                "last_notified_price": None,
+            })
 
-        # Amazon への連続アクセスを避けるため待機
+            # タイトル・URL を常に最新に更新
+            entry["title"] = book["title"]
+            entry["url"] = book["url"]
+            entry["query"] = query
+
+            # 価格履歴を記録（同日に重複しない）
+            history: list = entry.setdefault("history", [])
+            if not history or history[-1]["date"] != today:
+                history.append({
+                    "date": today,
+                    "price": book["price"],
+                    "orig_price": book.get("orig_price"),
+                    "discount_pct": book.get("discount_pct"),
+                })
+                # 最大90日分保持
+                entry["history"] = history[-90:]
+
+            # セール判定
+            disc = book.get("discount_pct")
+            if disc and disc >= min_discount:
+                if entry.get("last_notified_price") != book["price"]:
+                    sale_books.append({"query": query, **book})
+                    entry["last_notified_price"] = book["price"]
+            else:
+                # セール終了したらリセット
+                entry["last_notified_price"] = None
+
         time.sleep(random.uniform(3, 7))
 
     save_cache(cache)
@@ -242,9 +262,7 @@ def check_sales():
     log(f"セール検出: {len(sale_books)} 件")
 
     if not line_token or not line_user_id:
-        log("LINE 未設定のため通知スキップ。config.json を確認してください")
-        for b in sale_books:
-            log(f"  [{b.get('discount_pct')}%OFF] {b['title']} ¥{b['price']}")
+        log("LINE 未設定のため通知スキップ")
         return
 
     message = build_message(sale_books)
