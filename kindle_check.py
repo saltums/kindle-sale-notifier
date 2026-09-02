@@ -4,6 +4,7 @@ Playwright を使用してブラウザ経由でアクセス（ボット検知回
 """
 import json
 import os
+import re
 import random
 import sys
 import time
@@ -75,8 +76,17 @@ def search_kindle_playwright(page, query: str) -> list[dict]:
                 if not asin:
                     continue
 
-                title_el = item.locator("h2 a span").first
-                title = title_el.inner_text().strip() if title_el.count() > 0 else "不明"
+                # タイトル取得（複数セレクターを試す）
+                title = ""
+                for sel in ["h2 .a-link-normal span", "h2 a span", "h2 span"]:
+                    el = item.locator(sel).first
+                    if el.count() > 0:
+                        t = el.inner_text().strip()
+                        if t and len(t) > 1:
+                            title = t
+                            break
+                if not title:
+                    title = "不明"
 
                 price_el = item.locator(".a-price .a-offscreen").first
                 if price_el.count() == 0:
@@ -104,12 +114,20 @@ def search_kindle_playwright(page, query: str) -> list[dict]:
                 if discount_pct is None and orig_price and orig_price > 0:
                     discount_pct = int((1 - price / orig_price) * 100)
 
+                # ポイント還元率を取得（例: "500pt (50%還元)"）
+                point_pct = None
+                point_text = item.inner_text()
+                m = re.search(r'(\d+)\s*%\s*還元', point_text)
+                if m:
+                    point_pct = int(m.group(1))
+
                 books.append({
                     "asin": asin,
                     "title": title,
                     "price": price,
                     "orig_price": orig_price,
                     "discount_pct": discount_pct,
+                    "point_pct": point_pct,
                     "url": f"https://www.amazon.co.jp/dp/{asin}",
                 })
             except Exception:
@@ -151,12 +169,21 @@ def build_message(sale_books: list[dict]) -> str:
     lines = [f"📚 Kindle セール通知 ({now})\n"]
 
     for book in sale_books[:15]:
-        disc = book.get("discount_pct", "?")
+        disc = book.get("discount_pct")
+        point = book.get("point_pct")
         price = book["price"]
         orig = book.get("orig_price")
         orig_str = f" (元 ¥{orig:,})" if orig else ""
+
+        if disc and disc >= 50:
+            label = f"▼{disc}% オフ"
+        elif point and point >= 50:
+            label = f"🪙 {point}% ポイント還元"
+        else:
+            label = f"▼{disc or point}%"
+
         lines.append(
-            f"▼{disc}% オフ\n"
+            f"{label}\n"
             f"{book['title']}\n"
             f"¥{price:,}{orig_str}\n"
             f"{book['url']}\n"
@@ -231,11 +258,15 @@ def check_sales():
                         "price": book["price"],
                         "orig_price": book.get("orig_price"),
                         "discount_pct": book.get("discount_pct"),
+                        "point_pct": book.get("point_pct"),
                     })
                     entry["history"] = history[-90:]
 
-                disc = book.get("discount_pct")
-                if disc and disc >= min_discount:
+                disc = book.get("discount_pct") or 0
+                point = book.get("point_pct") or 0
+                # 割引率 OR ポイント還元率が min_discount 以上ならセール対象
+                is_sale = disc >= min_discount or point >= min_discount
+                if is_sale:
                     if entry.get("last_notified_price") != book["price"]:
                         sale_books.append({"query": query, **book})
                         entry["last_notified_price"] = book["price"]
