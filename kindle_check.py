@@ -1,5 +1,6 @@
 """
 Kindle Sale Notifier - Amazon.co.jp の登録著者/シリーズのセールを検知してLINE通知
+Playwright を使用してブラウザ経由でアクセス（ボット検知回避）
 """
 import json
 import os
@@ -10,23 +11,12 @@ from datetime import datetime
 from pathlib import Path
 
 import requests
-from bs4 import BeautifulSoup
+from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
 
 BASE_DIR = Path(__file__).parent
 CONFIG_FILE = BASE_DIR / "config.json"
 CACHE_FILE = BASE_DIR / "prices_cache.json"
 LOG_FILE = BASE_DIR / "check_log.txt"
-
-HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/124.0.0.0 Safari/537.36"
-    ),
-    "Accept-Language": "ja-JP,ja;q=0.9,en-US;q=0.8",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Encoding": "gzip, deflate, br",
-}
 
 
 def log(msg: str):
@@ -56,24 +46,6 @@ def save_cache(cache: dict):
         json.dump(cache, f, ensure_ascii=False, indent=2)
 
 
-def search_kindle(query: str) -> str | None:
-    url = "https://www.amazon.co.jp/s"
-    params = {
-        "k": query,
-        "i": "digital-text",
-        "s": "price-asc-rank",
-        "language": "ja_JP",
-    }
-    try:
-        resp = requests.get(url, params=params, headers=HEADERS, timeout=20)
-        resp.raise_for_status()
-        log(f"  → HTTPステータス: {resp.status_code}, サイズ: {len(resp.text)} bytes")
-        return resp.text
-    except Exception as e:
-        log(f"検索エラー '{query}': {e}")
-        return None
-
-
 def parse_price(text: str) -> int | None:
     cleaned = text.replace("￥", "").replace(",", "").replace("円", "").strip()
     try:
@@ -82,65 +54,75 @@ def parse_price(text: str) -> int | None:
         return None
 
 
-def parse_search_results(html: str) -> list[dict]:
-    soup = BeautifulSoup(html, "html.parser")
+def search_kindle_playwright(page, query: str) -> list[dict]:
+    url = f"https://www.amazon.co.jp/s?k={requests.utils.quote(query)}&i=digital-text&language=ja_JP"
+    try:
+        page.goto(url, wait_until="domcontentloaded", timeout=30000)
+        page.wait_for_timeout(random.randint(1500, 3000))
 
-    # ブロック検知
-    if "api-services-support@amazon.com" in html or "Enter the characters you see below" in html:
-        log("  ⚠ Amazon によるアクセス制限を検出")
+        # CAPTCHA チェック
+        if "api-services-support@amazon.com" in page.content() or page.locator("input#captchacharacters").count() > 0:
+            log(f"  ⚠ CAPTCHA 検出 - スキップ")
+            return []
+
+        items = page.locator('[data-component-type="s-search-result"]').all()
+        log(f"  → {len(items)} 件取得")
+
+        books = []
+        for item in items:
+            try:
+                asin = item.get_attribute("data-asin") or ""
+                if not asin:
+                    continue
+
+                title_el = item.locator("h2 a span").first
+                title = title_el.inner_text().strip() if title_el.count() > 0 else "不明"
+
+                price_el = item.locator(".a-price .a-offscreen").first
+                if price_el.count() == 0:
+                    continue
+                price = parse_price(price_el.inner_text())
+                if price is None:
+                    continue
+
+                orig_price = None
+                for orig_el in item.locator(".a-text-price .a-offscreen").all():
+                    orig = parse_price(orig_el.inner_text())
+                    if orig and orig > price:
+                        orig_price = orig
+                        break
+
+                discount_pct = None
+                badge_el = item.locator(".savingsPercentage").first
+                if badge_el.count() > 0:
+                    badge_text = badge_el.inner_text().strip().replace("%", "").replace("-", "")
+                    try:
+                        discount_pct = int(badge_text)
+                    except ValueError:
+                        pass
+
+                if discount_pct is None and orig_price and orig_price > 0:
+                    discount_pct = int((1 - price / orig_price) * 100)
+
+                books.append({
+                    "asin": asin,
+                    "title": title,
+                    "price": price,
+                    "orig_price": orig_price,
+                    "discount_pct": discount_pct,
+                    "url": f"https://www.amazon.co.jp/dp/{asin}",
+                })
+            except Exception:
+                continue
+
+        return books
+
+    except PWTimeout:
+        log(f"  タイムアウト: {query}")
         return []
-
-    results = soup.select('[data-component-type="s-search-result"]')
-    log(f"  → 検索結果要素数: {len(results)}")
-
-    books = []
-    for item in results:
-        try:
-            asin = item.get("data-asin", "").strip()
-            if not asin:
-                continue
-
-            title_el = item.select_one("h2 a span")
-            title = title_el.text.strip() if title_el else "不明"
-
-            price_el = item.select_one(".a-price .a-offscreen")
-            if not price_el:
-                continue
-            price = parse_price(price_el.text)
-            if price is None:
-                continue
-
-            orig_price = None
-            for orig_el in item.select(".a-text-price .a-offscreen"):
-                orig = parse_price(orig_el.text)
-                if orig and orig > price:
-                    orig_price = orig
-                    break
-
-            discount_pct = None
-            badge_el = item.select_one(".savingsPercentage")
-            if badge_el:
-                badge_text = badge_el.text.strip().replace("%", "").replace("-", "")
-                try:
-                    discount_pct = int(badge_text)
-                except ValueError:
-                    pass
-
-            if discount_pct is None and orig_price and orig_price > 0:
-                discount_pct = int((1 - price / orig_price) * 100)
-
-            books.append({
-                "asin": asin,
-                "title": title,
-                "price": price,
-                "orig_price": orig_price,
-                "discount_pct": discount_pct,
-                "url": f"https://www.amazon.co.jp/dp/{asin}",
-            })
-        except Exception:
-            continue
-
-    return books
+    except Exception as e:
+        log(f"  エラー: {e}")
+        return []
 
 
 def send_line_message(token: str, user_id: str, text: str) -> bool:
@@ -195,7 +177,6 @@ def check_sales():
 
     authors: list[str] = config.get("authors", [])
     series_list: list[str] = config.get("series", [])
-
     queries = [(a, "著者") for a in authors] + [(s, "シリーズ") for s in series_list]
 
     if not queries:
@@ -206,52 +187,64 @@ def check_sales():
     today = datetime.now().strftime("%Y-%m-%d")
     sale_books = []
 
-    for query, query_type in queries:
-        log(f"検索中 [{query_type}]: {query}")
-        html = search_kindle(query)
-        if not html:
-            continue
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch(headless=True)
+        context = browser.new_context(
+            locale="ja-JP",
+            timezone_id="Asia/Tokyo",
+            user_agent=(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/126.0.0.0 Safari/537.36"
+            ),
+        )
+        page = context.new_page()
 
-        books = parse_search_results(html)
+        # Amazon トップを一度開いてセッションを確立
+        try:
+            page.goto("https://www.amazon.co.jp/", wait_until="domcontentloaded", timeout=20000)
+            page.wait_for_timeout(random.randint(1000, 2000))
+        except Exception:
+            pass
 
-        for book in books:
-            asin = book["asin"]
-            entry = cache.setdefault(asin, {
-                "title": book["title"],
-                "url": book["url"],
-                "query": query,
-                "history": [],
-                "last_notified_price": None,
-            })
+        for query, query_type in queries:
+            log(f"検索中 [{query_type}]: {query}")
+            books = search_kindle_playwright(page, query)
 
-            # タイトル・URL を常に最新に更新
-            entry["title"] = book["title"]
-            entry["url"] = book["url"]
-            entry["query"] = query
-
-            # 価格履歴を記録（同日に重複しない）
-            history: list = entry.setdefault("history", [])
-            if not history or history[-1]["date"] != today:
-                history.append({
-                    "date": today,
-                    "price": book["price"],
-                    "orig_price": book.get("orig_price"),
-                    "discount_pct": book.get("discount_pct"),
+            for book in books:
+                asin = book["asin"]
+                entry = cache.setdefault(asin, {
+                    "title": book["title"],
+                    "url": book["url"],
+                    "query": query,
+                    "history": [],
+                    "last_notified_price": None,
                 })
-                # 最大90日分保持
-                entry["history"] = history[-90:]
+                entry["title"] = book["title"]
+                entry["url"] = book["url"]
+                entry["query"] = query
 
-            # セール判定
-            disc = book.get("discount_pct")
-            if disc and disc >= min_discount:
-                if entry.get("last_notified_price") != book["price"]:
-                    sale_books.append({"query": query, **book})
-                    entry["last_notified_price"] = book["price"]
-            else:
-                # セール終了したらリセット
-                entry["last_notified_price"] = None
+                history: list = entry.setdefault("history", [])
+                if not history or history[-1]["date"] != today:
+                    history.append({
+                        "date": today,
+                        "price": book["price"],
+                        "orig_price": book.get("orig_price"),
+                        "discount_pct": book.get("discount_pct"),
+                    })
+                    entry["history"] = history[-90:]
 
-        time.sleep(random.uniform(3, 7))
+                disc = book.get("discount_pct")
+                if disc and disc >= min_discount:
+                    if entry.get("last_notified_price") != book["price"]:
+                        sale_books.append({"query": query, **book})
+                        entry["last_notified_price"] = book["price"]
+                else:
+                    entry["last_notified_price"] = None
+
+            time.sleep(random.uniform(3, 6))
+
+        browser.close()
 
     save_cache(cache)
 
