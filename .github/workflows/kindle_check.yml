@@ -1,0 +1,27 @@
+name: Kindle Sale Check
+
+on:
+  schedule:
+    # 毎日 9:00 JST (= 0:00 UTC) に実行
+    - cron: "0 0 * * *"
+  workflow_dispatch: # 手動実行ボタンも有効化
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Kindle sale check
+        env:
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+        run: python kindle_check.py
