@@ -238,6 +238,7 @@ header{{display:flex;align-items:center;justify-content:space-between;padding:14
 .badge.point{{background:#7c5cbf;color:#fff}}
 .spark{{width:60px;height:22px;flex-shrink:0}}
 .dir-up{{color:#f08080;font-size:11px}}.dir-down{{color:var(--sale);font-size:11px}}
+.price-sub{{font-size:10px;color:var(--muted);text-align:right}}
 .empty-state{{text-align:center;padding:48px 20px;color:var(--muted)}}
 .empty-state h2{{font-size:16px;margin-bottom:6px;color:var(--text)}}
 @media(max-width:500px){{
@@ -338,8 +339,10 @@ function render() {{
     const priceDir = prev && price !== prev.price ? (price < prev.price ? '↓' : '↑') : '';
     const dirClass = priceDir === '↓' ? 'dir-down' : priceDir === '↑' ? 'dir-up' : '';
     const sparkKind = isSale ? 'sale' : isPoint ? 'point' : 'normal';
-    const badge = isSale ? `<span class="badge sale">▼${{disc}}%</span>`
-                : isPoint ? `<span class="badge point">🪙${{point}}%還元</span>` : '';
+    const badges = [];
+    if (disc >= 50) badges.push(`<span class="badge sale">▼${{disc}}%</span>`);
+    if (point >= 50) badges.push(`<span class="badge point">🪙${{point}}%還元</span>`);
+    const badge = badges.join(' ');
     return `<div class="list-row ${{isSale?'on-sale':isPoint?'on-point':''}}">
       <div class="row-left">
         <div class="row-title"><a href="${{book.url}}" target="_blank" rel="noopener">${{book.title||asin}}</a></div>
@@ -355,6 +358,8 @@ function render() {{
             ${{price!=null?'¥'+price.toLocaleString():'—'}}${{priceDir?`<span class="${{dirClass}}">${{priceDir}}</span>`:''}}
           </div>
           ${{orig&&orig!==price?`<div class="price-orig">¥${{orig.toLocaleString()}}</div>`:''}}
+          ${{disc&&disc<50?`<div class="price-sub">▼${{disc}}%</div>`:''}}
+          ${{point&&point<50?`<div class="price-sub">🪙${{point}}%還元</div>`:''}}
         </div>
         ${{badge}}
       </div>
@@ -460,15 +465,18 @@ def check_sales():
                 entry["query"] = query
 
                 history: list = entry.setdefault("history", [])
-                if not history or history[-1]["date"] != today:
-                    history.append({
-                        "date": today,
-                        "price": book["price"],
-                        "orig_price": book.get("orig_price"),
-                        "discount_pct": book.get("discount_pct"),
-                        "point_pct": book.get("point_pct"),
-                    })
-                    entry["history"] = history[-90:]
+                today_entry = {
+                    "date": today,
+                    "price": book["price"],
+                    "orig_price": book.get("orig_price"),
+                    "discount_pct": book.get("discount_pct"),
+                    "point_pct": book.get("point_pct"),
+                }
+                if history and history[-1]["date"] == today:
+                    history[-1] = today_entry  # 同日なら上書き
+                else:
+                    history.append(today_entry)
+                entry["history"] = history[-90:]
 
                 disc = book.get("discount_pct") or 0
                 point = book.get("point_pct") or 0

@@ -8,7 +8,8 @@
         "date": "2026-09-02",
         "price": 2420,
         "orig_price": null,
-        "discount_pct": null
+        "discount_pct": null,
+        "point_pct": null
       }
     ],
     "last_notified_price": null
@@ -22,7 +23,8 @@
         "date": "2026-09-02",
         "price": 710,
         "orig_price": 715,
-        "discount_pct": 0
+        "discount_pct": 0,
+        "point_pct": null
       }
     ],
     "last_notified_price": null
@@ -36,7 +38,8 @@
         "date": "2026-09-02",
         "price": 755,
         "orig_price": 770,
-        "discount_pct": 1
+        "discount_pct": 1,
+        "point_pct": null
       }
     ],
     "last_notified_price": null
@@ -50,7 +53,8 @@
         "date": "2026-09-02",
         "price": 663,
         "orig_price": 737,
-        "discount_pct": 10
+        "discount_pct": 10,
+        "point_pct": null
       }
     ],
     "last_notified_price": null
@@ -64,7 +68,8 @@
         "date": "2026-09-02",
         "price": 690,
         "orig_price": 693,
-        "discount_pct": 0
+        "discount_pct": 0,
+        "point_pct": null
       }
     ],
     "last_notified_price": null
@@ -78,7 +83,8 @@
         "date": "2026-09-02",
         "price": 624,
         "orig_price": 693,
-        "discount_pct": 9
+        "discount_pct": 9,
+        "point_pct": null
       }
     ],
     "last_notified_price": null
@@ -106,7 +112,8 @@
         "date": "2026-09-02",
         "price": 624,
         "orig_price": 693,
-        "discount_pct": 9
+        "discount_pct": 9,
+        "point_pct": null
       }
     ],
     "last_notified_price": null
@@ -134,7 +141,8 @@
         "date": "2026-09-02",
         "price": 4840,
         "orig_price": null,
-        "discount_pct": null
+        "discount_pct": null,
+        "point_pct": null
       }
     ],
     "last_notified_price": null
@@ -148,7 +156,8 @@
         "date": "2026-09-02",
         "price": 2420,
         "orig_price": null,
-        "discount_pct": null
+        "discount_pct": null,
+        "point_pct": null
       }
     ],
     "last_notified_price": null
@@ -162,7 +171,8 @@
         "date": "2026-09-02",
         "price": 683,
         "orig_price": 759,
-        "discount_pct": 10
+        "discount_pct": 10,
+        "point_pct": null
       }
     ],
     "last_notified_price": null
@@ -176,7 +186,8 @@
         "date": "2026-09-02",
         "price": 634,
         "orig_price": 704,
-        "discount_pct": 9
+        "discount_pct": 9,
+        "point_pct": null
       }
     ],
     "last_notified_price": null
@@ -190,7 +201,8 @@
         "date": "2026-09-02",
         "price": 678,
         "orig_price": 814,
-        "discount_pct": 16
+        "discount_pct": 16,
+        "point_pct": null
       }
     ],
     "last_notified_price": null
@@ -204,7 +216,8 @@
         "date": "2026-09-02",
         "price": 693,
         "orig_price": 770,
-        "discount_pct": 9
+        "discount_pct": 9,
+        "point_pct": null
       }
     ],
     "last_notified_price": null
@@ -232,7 +245,8 @@
         "date": "2026-09-02",
         "price": 515,
         "orig_price": 649,
-        "discount_pct": 20
+        "discount_pct": 20,
+        "point_pct": null
       }
     ],
     "last_notified_price": null
@@ -246,7 +260,8 @@
         "date": "2026-09-02",
         "price": 1980,
         "orig_price": 2200,
-        "discount_pct": 9
+        "discount_pct": 9,
+        "point_pct": null
       }
     ],
     "last_notified_price": null
@@ -260,7 +275,8 @@
         "date": "2026-09-02",
         "price": 703,
         "orig_price": 935,
-        "discount_pct": 24
+        "discount_pct": 24,
+        "point_pct": null
       }
     ],
     "last_notified_price": null
@@ -274,7 +290,8 @@
         "date": "2026-09-02",
         "price": 800,
         "orig_price": 825,
-        "discount_pct": 3
+        "discount_pct": 3,
+        "point_pct": null
       }
     ],
     "last_notified_price": null
@@ -288,7 +305,8 @@
         "date": "2026-09-02",
         "price": 601,
         "orig_price": 770,
-        "discount_pct": 21
+        "discount_pct": 21,
+        "point_pct": null
       }
     ],
     "last_notified_price": null
@@ -302,7 +320,8 @@
         "date": "2026-09-02",
         "price": 1683,
         "orig_price": 1870,
-        "discount_pct": 9
+        "discount_pct": 9,
+        "point_pct": null
       }
     ],
     "last_notified_price": null
@@ -316,7 +335,8 @@
         "date": "2026-09-02",
         "price": 663,
         "orig_price": 737,
-        "discount_pct": 10
+        "discount_pct": 10,
+        "point_pct": null
       }
     ],
     "last_notified_price": null
@@ -330,7 +350,8 @@
         "date": "2026-09-02",
         "price": 440,
         "orig_price": 660,
-        "discount_pct": 33
+        "discount_pct": 33,
+        "point_pct": null
       }
     ],
     "last_notified_price": null
@@ -344,7 +365,8 @@
         "date": "2026-09-02",
         "price": 730,
         "orig_price": 825,
-        "discount_pct": 11
+        "discount_pct": 11,
+        "point_pct": null
       }
     ],
     "last_notified_price": null
@@ -372,7 +394,8 @@
         "date": "2026-09-02",
         "price": 949,
         "orig_price": 968,
-        "discount_pct": 1
+        "discount_pct": 1,
+        "point_pct": null
       }
     ],
     "last_notified_price": null
@@ -414,7 +437,8 @@
         "date": "2026-09-02",
         "price": 742,
         "orig_price": 825,
-        "discount_pct": 10
+        "discount_pct": 10,
+        "point_pct": null
       }
     ],
     "last_notified_price": null
@@ -442,7 +466,8 @@
         "date": "2026-09-02",
         "price": 703,
         "orig_price": 748,
-        "discount_pct": 6
+        "discount_pct": 6,
+        "point_pct": null
       }
     ],
     "last_notified_price": null
@@ -456,7 +481,8 @@
         "date": "2026-09-02",
         "price": 734,
         "orig_price": 825,
-        "discount_pct": 11
+        "discount_pct": 11,
+        "point_pct": null
       }
     ],
     "last_notified_price": null
