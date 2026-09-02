@@ -164,6 +164,8 @@ def send_line_message(token: str, user_id: str, text: str) -> bool:
         return False
 
 
+DASHBOARD_URL = "https://claude.ai/code/artifact/2f89d946-a00d-46f1-a55a-1321b71e096d"
+
 def build_message(sale_books: list[dict]) -> str:
     now = datetime.now().strftime("%m/%d %H:%M")
     lines = [f"📚 Kindle セール通知 ({now})\n"]
@@ -190,7 +192,9 @@ def build_message(sale_books: list[dict]) -> str:
         )
 
     if len(sale_books) > 15:
-        lines.append(f"…他 {len(sale_books) - 15} 件")
+        lines.append(f"…他 {len(sale_books) - 15} 件\n")
+
+    lines.append(f"📊 一覧はこちら\n{DASHBOARD_URL}")
 
     return "\n".join(lines)
 
