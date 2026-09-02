@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kindle 価格トラッカー</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;600&family=Inter:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#111318;--surface:#1c1f2e;--surface-2:#252838;--border:#2f334a;
+  --text:#dfe1ed;--muted:#686c92;--accent:#e85d26;--sale:#38c060;
+  --radius:10px;--font-serif:'Noto Serif JP',serif;--font-sans:'Inter',system-ui,sans-serif;
+}
+@media(prefers-color-scheme:light){
+  :root{--bg:#f0ede8;--surface:#fff;--surface-2:#f7f4ef;--border:#dddad3;--text:#1a1c28;--muted:#7a7d9a;}
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:14px;line-height:1.5;min-height:100vh}
+header{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:10}
+.logo{display:flex;align-items:center;gap:10px;font-family:var(--font-serif);font-weight:600;font-size:17px}
+.logo-dot{width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.last-updated{font-size:12px;color:var(--muted)}
+.stats-bar{display:flex;gap:1px;background:var(--border);border-bottom:1px solid var(--border)}
+.stat{flex:1;background:var(--surface);padding:14px 20px;display:flex;flex-direction:column;gap:2px}
+.stat-value{font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1}
+.stat-value.orange{color:var(--accent)}.stat-value.green{color:var(--sale)}
+.stat-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+.toolbar{display:flex;align-items:center;gap:8px;padding:14px 24px;flex-wrap:wrap}
+.filter-btn{background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:20px;padding:5px 14px;cursor:pointer;font-size:13px;font-family:var(--font-sans);transition:all .15s}
+.filter-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.filter-btn:hover:not(.active){border-color:var(--text);color:var(--text)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;padding:0 24px 32px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;display:flex;flex-direction:column;gap:12px;transition:border-color .2s}
+.card:hover{border-color:var(--muted)}.card.on-sale{border-color:var(--sale)}
+.card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.book-title{font-family:var(--font-serif);font-size:14px;font-weight:600;line-height:1.4;flex:1}
+.book-title a{color:var(--text);text-decoration:none}.book-title a:hover{color:var(--accent)}
+.sale-badge{background:var(--sale);color:#fff;font-size:11px;font-weight:600;padding:2px 7px;border-radius:4px;flex-shrink:0}
+.point-badge{background:#7c5cbf;color:#fff;font-size:11px;font-weight:600;padding:2px 7px;border-radius:4px;flex-shrink:0}
+.author-tag{font-size:11px;color:var(--muted);background:var(--surface-2);border:1px solid var(--border);border-radius:4px;padding:2px 7px;display:inline-block;align-self:flex-start}
+.price-row{display:flex;align-items:baseline;gap:8px}
+.price-current{font-size:22px;font-weight:600;font-variant-numeric:tabular-nums}
+.price-current.sale{color:var(--sale)}.price-current.point{color:#a78bfa}
+.price-orig{font-size:13px;color:var(--muted);text-decoration:line-through;font-variant-numeric:tabular-nums}
+.sparkline-wrap{display:flex;flex-direction:column;gap:4px}
+.sparkline-label{font-size:11px;color:var(--muted)}
+.sparkline{width:100%;height:36px;display:block}
+.empty-state{grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--muted)}
+.empty-state h2{font-size:18px;margin-bottom:8px;color:var(--text)}
+@media(max-width:600px){.stats-bar{flex-wrap:wrap}.stat{min-width:50%}.grid{padding:0 16px 24px}header{padding:14px 16px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><div class="logo-dot"></div>Kindle 価格トラッカー</div>
+  <span class="last-updated">更新: 2026-09-02 21:21</span>
+</header>
+<div class="stats-bar">
+  <div class="stat"><div class="stat-value" id="stat-total">—</div><div class="stat-label">追跡中の本</div></div>
+  <div class="stat"><div class="stat-value orange" id="stat-sale">—</div><div class="stat-label">セール中</div></div>
+  <div class="stat"><div class="stat-value" id="stat-authors">—</div><div class="stat-label">著者 / シリーズ</div></div>
+  <div class="stat"><div class="stat-value green" id="stat-max-disc">—</div><div class="stat-label">最大お得率</div></div>
+</div>
+<div class="toolbar" id="toolbar"></div>
+<div class="grid" id="grid"></div>
+<script>
+const DATA = {"B0F6YBCY4Y": {"title": "世界99　上 (集英社文芸単行本)", "url": "https://www.amazon.co.jp/dp/B0F6YBCY4Y", "query": "村田沙耶香", "history": [{"date": "2026-09-02", "price": 2420, "orig_price": null, "discount_pct": null}], "last_notified_price": null}, "B0F66R1Z1R": {"title": "信仰 (文春文庫)", "url": "https://www.amazon.co.jp/dp/B0F66R1Z1R", "query": "村田沙耶香", "history": [{"date": "2026-09-02", "price": 710, "orig_price": 715, "discount_pct": 0}], "last_notified_price": null}, "B00BTQBMHE": {"title": "しろいろの街の、その骨の体温の", "url": "https://www.amazon.co.jp/dp/B00BTQBMHE", "query": "村田沙耶香", "history": [{"date": "2026-09-02", "price": 755, "orig_price": 770, "discount_pct": 1}], "last_notified_price": null}, "B08XX82JV1": {"title": "地球星人（新潮文庫）", "url": "https://www.amazon.co.jp/dp/B08XX82JV1", "query": "村田沙耶香", "history": [{"date": "2026-09-02", "price": 663, "orig_price": 737, "discount_pct": 10}], "last_notified_price": null}, "B07GYMDBCM": {"title": "コンビニ人間 (文春文庫)", "url": "https://www.amazon.co.jp/dp/B07GYMDBCM", "query": "村田沙耶香", "history": [{"date": "2026-09-02", "price": 690, "orig_price": 693, "discount_pct": 0}], "last_notified_price": null}, "B09Z2B1NN1": {"title": "生命式 (河出文庫)", "url": "https://www.amazon.co.jp/dp/B09Z2B1NN1", "query": "村田沙耶香", "history": [{"date": "2026-09-02", "price": 624, "orig_price": 693, "discount_pct": 9}], "last_notified_price": null}, "B07DXV6T8L": {"title": "不明", "url": "https://www.amazon.co.jp/dp/B07DXV6T8L", "query": "村田沙耶香", "history": [{"date": "2026-09-02", "price": 297, "orig_price": 589, "discount_pct": 49}], "last_notified_price": null}, "B07G52SV3V": {"title": "消滅世界 (河出文庫)", "url": "https://www.amazon.co.jp/dp/B07G52SV3V", "query": "村田沙耶香", "history": [{"date": "2026-09-02", "price": 624, "orig_price": 693, "discount_pct": 9}], "last_notified_price": null}, "B01JYUTHX2": {"title": "殺人出産 (講談社文庫)", "url": "https://www.amazon.co.jp/dp/B01JYUTHX2", "query": "村田沙耶香", "history": [{"date": "2026-09-02", "price": 0, "orig_price": null, "discount_pct": null}], "last_notified_price": null}, "B0DYTN4MH8": {"title": "【合本版】世界99 (集英社文芸単行本)", "url": "https://www.amazon.co.jp/dp/B0DYTN4MH8", "query": "村田沙耶香", "history": [{"date": "2026-09-02", "price": 4840, "orig_price": null, "discount_pct": null}], "last_notified_price": null}, "B0F6Y62JRT": {"title": "世界99　下 (集英社文芸単行本)", "url": "https://www.amazon.co.jp/dp/B0F6Y62JRT", "query": "村田沙耶香", "history": [{"date": "2026-09-02", "price": 2420, "orig_price": null, "discount_pct": null}], "last_notified_price": null}, "B09MYQQW49": {"title": "私が食べた本 (朝日文庫)", "url": "https://www.amazon.co.jp/dp/B09MYQQW49", "query": "村田沙耶香", "history": [{"date": "2026-09-02", "price": 683, "orig_price": 759, "discount_pct": 10}], "last_notified_price": null}, "B0BV8XGX67": {"title": "丸の内魔法少女ミラクリーナ (角川文庫)", "url": "https://www.amazon.co.jp/dp/B0BV8XGX67", "query": "村田沙耶香", "history": [{"date": "2026-09-02", "price": 634, "orig_price": 704, "discount_pct": 9}], "last_notified_price": null}, "B06Y5T3RP7": {"title": "きれいなシワの作り方～淑女の思春期病", "url": "https://www.amazon.co.jp/dp/B06Y5T3RP7", "query": "村田沙耶香", "history": [{"date": "2026-09-02", "price": 678, "orig_price": 814, "discount_pct": 16}], "last_notified_price": null}, "B09KRPV2WR": {"title": "となりの脳世界 (朝日文庫)", "url": "https://www.amazon.co.jp/dp/B09KRPV2WR", "query": "村田沙耶香", "history": [{"date": "2026-09-02", "price": 693, "orig_price": 770, "discount_pct": 9}], "last_notified_price": null}, "B00JEZZ1O2": {"title": "授乳 (講談社文庫)", "url": "https://www.amazon.co.jp/dp/B00JEZZ1O2", "query": "村田沙耶香", "history": [{"date": "2026-09-02", "price": 0, "orig_price": null, "discount_pct": null}], "last_notified_price": null}, "B06XTGGVZL": {"title": "タダイマトビラ（新潮文庫）", "url": "https://www.amazon.co.jp/dp/B06XTGGVZL", "query": "村田沙耶香", "history": [{"date": "2026-09-02", "price": 515, "orig_price": 649, "discount_pct": 20}], "last_notified_price": null}, "B0FNW8F843": {"title": "イン・ザ・メガチャーチ (日本経済新聞出版)", "url": "https://www.amazon.co.jp/dp/B0FNW8F843", "query": "浅井リョウ", "history": [{"date": "2026-09-02", "price": 1980, "orig_price": 2200, "discount_pct": 9}], "last_notified_price": null}, "B0C2YB5488": {"title": "正欲（新潮文庫）", "url": "https://www.amazon.co.jp/dp/B0C2YB5488", "query": "浅井リョウ", "history": [{"date": "2026-09-02", "price": 703, "orig_price": 935, "discount_pct": 24}], "last_notified_price": null}, "B0FCV997XS": {"title": "そして誰もゆとらなくなった (文春文庫)", "url": "https://www.amazon.co.jp/dp/B0FCV997XS", "query": "浅井リョウ", "history": [{"date": "2026-09-02", "price": 800, "orig_price": 825, "discount_pct": 3}], "last_notified_price": null}, "B00S9CVGXQ": {"title": "時をかけるゆとり (文春文庫)", "url": "https://www.amazon.co.jp/dp/B00S9CVGXQ", "query": "浅井リョウ", "history": [{"date": "2026-09-02", "price": 601, "orig_price": 770, "discount_pct": 21}], "last_notified_price": null}, "B0D86NGY6Q": {"title": "生殖記", "url": "https://www.amazon.co.jp/dp/B0D86NGY6Q", "query": "浅井リョウ", "history": [{"date": "2026-09-02", "price": 1683, "orig_price": 1870, "discount_pct": 9}], "last_notified_price": null}, "B01916B8TU": {"title": "何者（新潮文庫）", "url": "https://www.amazon.co.jp/dp/B01916B8TU", "query": "浅井リョウ", "history": [{"date": "2026-09-02", "price": 663, "orig_price": 737, "discount_pct": 10}], "last_notified_price": null}, "B00A773H60": {"title": "桐島、部活やめるってよ (集英社文庫)", "url": "https://www.amazon.co.jp/dp/B00A773H60", "query": "浅井リョウ", "history": [{"date": "2026-09-02", "price": 440, "orig_price": 660, "discount_pct": 33}], "last_notified_price": null}, "B087WS4NC4": {"title": "風と共にゆとりぬ (文春文庫)", "url": "https://www.amazon.co.jp/dp/B087WS4NC4", "query": "浅井リョウ", "history": [{"date": "2026-09-02", "price": 730, "orig_price": 825, "discount_pct": 11}], "last_notified_price": null}, "B09MQ8WFN5": {"title": "どうしても生きてる (幻冬舎文庫)", "url": "https://www.amazon.co.jp/dp/B09MQ8WFN5", "query": "浅井リョウ", "history": [{"date": "2026-09-02", "price": 0, "orig_price": null, "discount_pct": null}], "last_notified_price": null}, "B0BJKJSK6T": {"title": "死にがいを求めて生きているの (中公文庫)", "url": "https://www.amazon.co.jp/dp/B0BJKJSK6T", "query": "浅井リョウ", "history": [{"date": "2026-09-02", "price": 949, "orig_price": 968, "discount_pct": 1}], "last_notified_price": null}, "B0BXCLYD5R": {"title": "スター", "url": "https://www.amazon.co.jp/dp/B0BXCLYD5R", "query": "浅井リョウ", "history": [{"date": "2026-09-02", "price": 0, "orig_price": null, "discount_pct": null}], "last_notified_price": null}, "B07K6FMJB5": {"title": "世にも奇妙な君物語 (講談社文庫)", "url": "https://www.amazon.co.jp/dp/B07K6FMJB5", "query": "浅井リョウ", "history": [{"date": "2026-09-02", "price": 0, "orig_price": null, "discount_pct": null}], "last_notified_price": null}, "B07VWNTG7R": {"title": "何様（新潮文庫）", "url": "https://www.amazon.co.jp/dp/B07VWNTG7R", "query": "浅井リョウ", "history": [{"date": "2026-09-02", "price": 742, "orig_price": 825, "discount_pct": 10}], "last_notified_price": null}, "B00JQ4ZBWI": {"title": "もういちど生まれる", "url": "https://www.amazon.co.jp/dp/B00JQ4ZBWI", "query": "浅井リョウ", "history": [{"date": "2026-09-02", "price": 0, "orig_price": null, "discount_pct": null}], "last_notified_price": null}, "B07QCBMBJQ": {"title": "ままならないから私とあなた (文春文庫)", "url": "https://www.amazon.co.jp/dp/B07QCBMBJQ", "query": "浅井リョウ", "history": [{"date": "2026-09-02", "price": 703, "orig_price": 748, "discount_pct": 6}], "last_notified_price": null}, "B07B959XMF": {"title": "武道館 (文春文庫)", "url": "https://www.amazon.co.jp/dp/B07B959XMF", "query": "浅井リョウ", "history": [{"date": "2026-09-02", "price": 734, "orig_price": 825, "discount_pct": 11}], "last_notified_price": null}};
+let activeFilter = 'all';
+
+function buildSparkline(history, color) {
+  if (!history || history.length < 2) return '';
+  const prices = history.slice(-14).map(h => h.price);
+  const min = Math.min(...prices), max = Math.max(...prices), range = max - min || 1;
+  const W = 260, H = 36, pad = 3;
+  const pts = prices.map((p, i) => {
+    const x = pad + (i / (prices.length - 1)) * (W - pad * 2);
+    const y = pad + ((max - p) / range) * (H - pad * 2);
+    return `${x},${y}`;
+  });
+  const fill = pts[0].split(',')[0] + ',' + H + ' ' + pts.join(' ') + ' ' + pts[pts.length-1].split(',')[0] + ',' + H;
+  const fc = color === 'sale' ? 'rgba(56,192,96,.15)' : color === 'point' ? 'rgba(124,92,191,.15)' : 'rgba(232,93,38,.1)';
+  const sc = color === 'sale' ? '#38c060' : color === 'point' ? '#a78bfa' : '#e85d26';
+  return `<svg class="sparkline" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+    <polygon points="${fill}" fill="${fc}"/>
+    <polyline points="${pts.join(' ')}" fill="none" stroke="${sc}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="${pts[pts.length-1].split(',')[0]}" cy="${pts[pts.length-1].split(',')[1]}" r="3" fill="${sc}"/>
+  </svg>`;
+}
+
+function render() {
+  const entries = Object.entries(DATA);
+  const queries = [...new Set(entries.map(([,v]) => v.query).filter(Boolean))];
+  const saleEntries = entries.filter(([,v]) => {
+    const h = v.history?.at(-1);
+    return (h?.discount_pct >= 50) || (h?.point_pct >= 50);
+  });
+  const maxVal = Math.max(0, ...entries.map(([,v]) => {
+    const h = v.history?.at(-1);
+    return Math.max(h?.discount_pct ?? 0, h?.point_pct ?? 0);
+  }));
+
+  document.getElementById('stat-total').textContent = entries.length;
+  document.getElementById('stat-sale').textContent = saleEntries.length;
+  document.getElementById('stat-authors').textContent = queries.length;
+  document.getElementById('stat-max-disc').textContent = maxVal > 0 ? maxVal + '%' : '—';
+
+  const toolbar = document.getElementById('toolbar');
+  const filters = [
+    {key:'all', label:'すべて'},
+    {key:'sale', label:'セール中' + (saleEntries.length ? ' (' + saleEntries.length + ')' : '')},
+    ...queries.map(q => ({key:'q:' + q, label:q})),
+  ];
+  toolbar.innerHTML = filters.map(f =>
+    `<button class="filter-btn ${activeFilter === f.key ? 'active' : ''}" data-filter="${f.key}">${f.label}</button>`
+  ).join('');
+  toolbar.querySelectorAll('.filter-btn').forEach(btn =>
+    btn.addEventListener('click', () => { activeFilter = btn.dataset.filter; render(); })
+  );
+
+  let visible = entries;
+  if (activeFilter === 'sale') visible = saleEntries;
+  else if (activeFilter.startsWith('q:')) visible = entries.filter(([,v]) => v.query === activeFilter.slice(2));
+
+  if (!visible.length) {
+    document.getElementById('grid').innerHTML = `<div class="empty-state"><h2>${entries.length ? '該当なし' : 'データなし'}</h2><p>まだ価格データが収集されていません。</p></div>`;
+    return;
+  }
+
+  visible.sort(([,a],[,b]) => {
+    const av = Math.max(a.history?.at(-1)?.discount_pct??0, a.history?.at(-1)?.point_pct??0);
+    const bv = Math.max(b.history?.at(-1)?.discount_pct??0, b.history?.at(-1)?.point_pct??0);
+    return bv - av;
+  });
+
+  document.getElementById('grid').innerHTML = visible.map(([asin, book]) => {
+    const last = book.history?.at(-1);
+    const prev = book.history?.at(-2);
+    const price = last?.price;
+    const orig = last?.orig_price;
+    const disc = last?.discount_pct ?? 0;
+    const point = last?.point_pct ?? 0;
+    const isSale = disc >= 50;
+    const isPoint = !isSale && point >= 50;
+    const priceDir = (prev && price !== prev.price) ? (price < prev.price ? '↓' : '↑') : '';
+    const sparkKind = isSale ? 'sale' : isPoint ? 'point' : 'normal';
+    const sparkline = buildSparkline(book.history, sparkKind);
+    const badge = isSale ? `<span class="sale-badge">▼${disc}%</span>`
+                : isPoint ? `<span class="point-badge">🪙${point}%還元</span>` : '';
+    return `<div class="card ${isSale||isPoint?'on-sale':''}">
+      <div class="card-header">
+        <div class="book-title"><a href="${book.url}" target="_blank" rel="noopener">${book.title||asin}</a></div>
+        ${badge}
+      </div>
+      ${book.query ? `<span class="author-tag">${book.query}</span>` : ''}
+      <div class="price-row">
+        <span class="price-current ${isSale?'sale':isPoint?'point':''}">
+          ${price!=null?'¥'+price.toLocaleString():'—'}
+          ${priceDir?`<span style="font-size:14px;color:${priceDir==='↓'?'var(--sale)':'#f08080'}">${priceDir}</span>`:''}
+        </span>
+        ${orig&&orig!==price?`<span class="price-orig">¥${orig.toLocaleString()}</span>`:''}
+      </div>
+      ${sparkline?`<div class="sparkline-wrap"><span class="sparkline-label">価格推移（直近${Math.min(book.history.length,14)}日）</span>${sparkline}</div>`:''}
+      ${last?.date?`<div style="font-size:11px;color:var(--muted)">確認: ${last.date}</div>`:''}
+    </div>`;
+  }).join('');
+}
+render();
+</script>
+</body>
+</html>
