@@ -92,7 +92,7 @@ def search_kindle_playwright(page, query: str) -> list[dict]:
                 if price_el.count() == 0:
                     continue
                 price = parse_price(price_el.inner_text())
-                if price is None:
+                if price is None or price == 0:  # KU 無料本を除外
                     continue
 
                 orig_price = None
@@ -187,45 +187,65 @@ def generate_dashboard(cache: dict):
 :root{{
   --bg:#111318;--surface:#1c1f2e;--surface-2:#252838;--border:#2f334a;
   --text:#dfe1ed;--muted:#686c92;--accent:#e85d26;--sale:#38c060;
-  --radius:10px;--font-serif:'Noto Serif JP',serif;--font-sans:'Inter',system-ui,sans-serif;
+  --font-serif:'Noto Serif JP',serif;--font-sans:'Inter',system-ui,sans-serif;
 }}
 @media(prefers-color-scheme:light){{
   :root{{--bg:#f0ede8;--surface:#fff;--surface-2:#f7f4ef;--border:#dddad3;--text:#1a1c28;--muted:#7a7d9a;}}
 }}
 *,*::before,*::after{{box-sizing:border-box;margin:0;padding:0}}
-body{{background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:14px;line-height:1.5;min-height:100vh}}
-header{{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:10}}
-.logo{{display:flex;align-items:center;gap:10px;font-family:var(--font-serif);font-weight:600;font-size:17px}}
-.logo-dot{{width:8px;height:8px;border-radius:50%;background:var(--accent)}}
-.last-updated{{font-size:12px;color:var(--muted)}}
+body{{background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:13px;line-height:1.4;min-height:100vh}}
+header{{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:10}}
+.logo{{display:flex;align-items:center;gap:8px;font-family:var(--font-serif);font-weight:600;font-size:15px}}
+.logo-dot{{width:7px;height:7px;border-radius:50%;background:var(--accent)}}
+.last-updated{{font-size:11px;color:var(--muted)}}
 .stats-bar{{display:flex;gap:1px;background:var(--border);border-bottom:1px solid var(--border)}}
-.stat{{flex:1;background:var(--surface);padding:14px 20px;display:flex;flex-direction:column;gap:2px}}
-.stat-value{{font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1}}
+.stat{{flex:1;background:var(--surface);padding:10px 16px;display:flex;flex-direction:column;gap:1px}}
+.stat-value{{font-size:20px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1}}
 .stat-value.orange{{color:var(--accent)}}.stat-value.green{{color:var(--sale)}}
-.stat-label{{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}}
-.toolbar{{display:flex;align-items:center;gap:8px;padding:14px 24px;flex-wrap:wrap}}
-.filter-btn{{background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:20px;padding:5px 14px;cursor:pointer;font-size:13px;font-family:var(--font-sans);transition:all .15s}}
+.stat-label{{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}}
+.toolbar{{display:flex;align-items:center;gap:6px;padding:10px 20px;flex-wrap:wrap;border-bottom:1px solid var(--border);background:var(--surface)}}
+.filter-btn{{background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:20px;padding:3px 12px;cursor:pointer;font-size:12px;font-family:var(--font-sans);transition:all .12s}}
 .filter-btn.active{{background:var(--accent);border-color:var(--accent);color:#fff}}
 .filter-btn:hover:not(.active){{border-color:var(--text);color:var(--text)}}
-.grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;padding:0 24px 32px}}
-.card{{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;display:flex;flex-direction:column;gap:12px;transition:border-color .2s}}
-.card:hover{{border-color:var(--muted)}}.card.on-sale{{border-color:var(--sale)}}
-.card-header{{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}}
-.book-title{{font-family:var(--font-serif);font-size:14px;font-weight:600;line-height:1.4;flex:1}}
-.book-title a{{color:var(--text);text-decoration:none}}.book-title a:hover{{color:var(--accent)}}
-.sale-badge{{background:var(--sale);color:#fff;font-size:11px;font-weight:600;padding:2px 7px;border-radius:4px;flex-shrink:0}}
-.point-badge{{background:#7c5cbf;color:#fff;font-size:11px;font-weight:600;padding:2px 7px;border-radius:4px;flex-shrink:0}}
-.author-tag{{font-size:11px;color:var(--muted);background:var(--surface-2);border:1px solid var(--border);border-radius:4px;padding:2px 7px;display:inline-block;align-self:flex-start}}
-.price-row{{display:flex;align-items:baseline;gap:8px}}
-.price-current{{font-size:22px;font-weight:600;font-variant-numeric:tabular-nums}}
+/* ── List layout ── */
+.list{{padding:0 20px 24px}}
+.list-row{{
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:8px 16px;
+  align-items:center;
+  padding:10px 0;
+  border-bottom:1px solid var(--border);
+  transition:background .1s;
+}}
+.list-row:hover{{background:var(--surface-2);margin:0 -20px;padding:10px 20px}}
+.list-row.on-sale .row-title a{{color:var(--sale)}}
+.list-row.on-point .row-title a{{color:#a78bfa}}
+.row-left{{display:flex;flex-direction:column;gap:3px;min-width:0}}
+.row-title{{font-family:var(--font-serif);font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
+.row-title a{{color:var(--text);text-decoration:none}}
+.row-title a:hover{{text-decoration:underline}}
+.row-meta{{display:flex;align-items:center;gap:6px;flex-wrap:wrap}}
+.author-tag{{font-size:10px;color:var(--muted);background:var(--surface-2);border:1px solid var(--border);border-radius:3px;padding:1px 5px}}
+.row-date{{font-size:10px;color:var(--muted)}}
+.row-right{{display:flex;align-items:center;gap:8px;flex-shrink:0}}
+.price-block{{text-align:right}}
+.price-current{{font-size:14px;font-weight:600;font-variant-numeric:tabular-nums}}
 .price-current.sale{{color:var(--sale)}}.price-current.point{{color:#a78bfa}}
-.price-orig{{font-size:13px;color:var(--muted);text-decoration:line-through;font-variant-numeric:tabular-nums}}
-.sparkline-wrap{{display:flex;flex-direction:column;gap:4px}}
-.sparkline-label{{font-size:11px;color:var(--muted)}}
-.sparkline{{width:100%;height:36px;display:block}}
-.empty-state{{grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--muted)}}
-.empty-state h2{{font-size:18px;margin-bottom:8px;color:var(--text)}}
-@media(max-width:600px){{.stats-bar{{flex-wrap:wrap}}.stat{{min-width:50%}}.grid{{padding:0 16px 24px}}header{{padding:14px 16px}}}}
+.price-orig{{font-size:11px;color:var(--muted);text-decoration:line-through;font-variant-numeric:tabular-nums}}
+.badge{{font-size:10px;font-weight:700;padding:2px 6px;border-radius:3px;white-space:nowrap}}
+.badge.sale{{background:var(--sale);color:#fff}}
+.badge.point{{background:#7c5cbf;color:#fff}}
+.spark{{width:60px;height:22px;flex-shrink:0}}
+.dir-up{{color:#f08080;font-size:11px}}.dir-down{{color:var(--sale);font-size:11px}}
+.empty-state{{text-align:center;padding:48px 20px;color:var(--muted)}}
+.empty-state h2{{font-size:16px;margin-bottom:6px;color:var(--text)}}
+@media(max-width:500px){{
+  .stats-bar{{flex-wrap:wrap}}.stat{{min-width:50%}}
+  .spark{{display:none}}.list{{padding:0 12px 20px}}
+  header{{padding:12px 14px}}.toolbar{{padding:8px 12px}}
+  .list-row:hover{{margin:0 -12px;padding:10px 12px}}
+}}
 </style>
 </head>
 <body>
@@ -240,28 +260,25 @@ header{{display:flex;align-items:center;justify-content:space-between;padding:18
   <div class="stat"><div class="stat-value green" id="stat-max-disc">—</div><div class="stat-label">最大お得率</div></div>
 </div>
 <div class="toolbar" id="toolbar"></div>
-<div class="grid" id="grid"></div>
+<div class="list" id="list"></div>
 <script>
 const DATA = {data_json};
 let activeFilter = 'all';
 
-function buildSparkline(history, color) {{
+function miniSpark(history, color) {{
   if (!history || history.length < 2) return '';
-  const prices = history.slice(-14).map(h => h.price);
+  const prices = history.slice(-10).map(h => h.price);
   const min = Math.min(...prices), max = Math.max(...prices), range = max - min || 1;
-  const W = 260, H = 36, pad = 3;
+  const W = 60, H = 22, pad = 2;
   const pts = prices.map((p, i) => {{
     const x = pad + (i / (prices.length - 1)) * (W - pad * 2);
     const y = pad + ((max - p) / range) * (H - pad * 2);
-    return `${{x}},${{y}}`;
+    return x.toFixed(1) + ',' + y.toFixed(1);
   }});
-  const fill = pts[0].split(',')[0] + ',' + H + ' ' + pts.join(' ') + ' ' + pts[pts.length-1].split(',')[0] + ',' + H;
-  const fc = color === 'sale' ? 'rgba(56,192,96,.15)' : color === 'point' ? 'rgba(124,92,191,.15)' : 'rgba(232,93,38,.1)';
-  const sc = color === 'sale' ? '#38c060' : color === 'point' ? '#a78bfa' : '#e85d26';
-  return `<svg class="sparkline" viewBox="0 0 ${{W}} ${{H}}" preserveAspectRatio="none">
-    <polygon points="${{fill}}" fill="${{fc}}"/>
-    <polyline points="${{pts.join(' ')}}" fill="none" stroke="${{sc}}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-    <circle cx="${{pts[pts.length-1].split(',')[0]}}" cy="${{pts[pts.length-1].split(',')[1]}}" r="3" fill="${{sc}}"/>
+  const sc = color === 'sale' ? '#38c060' : color === 'point' ? '#a78bfa' : '#686c92';
+  return `<svg class="spark" viewBox="0 0 ${{W}} ${{H}}" preserveAspectRatio="none">
+    <polyline points="${{pts.join(' ')}}" fill="none" stroke="${{sc}}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity=".8"/>
+    <circle cx="${{pts[pts.length-1].split(',')[0]}}" cy="${{pts[pts.length-1].split(',')[1]}}" r="2" fill="${{sc}}"/>
   </svg>`;
 }}
 
@@ -289,7 +306,7 @@ function render() {{
     ...queries.map(q => ({{key:'q:' + q, label:q}})),
   ];
   toolbar.innerHTML = filters.map(f =>
-    `<button class="filter-btn ${{activeFilter === f.key ? 'active' : ''}}" data-filter="${{f.key}}">${{f.label}}</button>`
+    `<button class="filter-btn ${{activeFilter===f.key?'active':''}}" data-filter="${{f.key}}">${{f.label}}</button>`
   ).join('');
   toolbar.querySelectorAll('.filter-btn').forEach(btn =>
     btn.addEventListener('click', () => {{ activeFilter = btn.dataset.filter; render(); }})
@@ -300,7 +317,7 @@ function render() {{
   else if (activeFilter.startsWith('q:')) visible = entries.filter(([,v]) => v.query === activeFilter.slice(2));
 
   if (!visible.length) {{
-    document.getElementById('grid').innerHTML = `<div class="empty-state"><h2>${{entries.length ? '該当なし' : 'データなし'}}</h2><p>まだ価格データが収集されていません。</p></div>`;
+    document.getElementById('list').innerHTML = `<div class="empty-state"><h2>${{entries.length?'該当なし':'データなし'}}</h2><p>まだ価格データが収集されていません。</p></div>`;
     return;
   }}
 
@@ -310,35 +327,37 @@ function render() {{
     return bv - av;
   }});
 
-  document.getElementById('grid').innerHTML = visible.map(([asin, book]) => {{
+  document.getElementById('list').innerHTML = visible.map(([asin, book]) => {{
     const last = book.history?.at(-1);
     const prev = book.history?.at(-2);
     const price = last?.price;
     const orig = last?.orig_price;
     const disc = last?.discount_pct ?? 0;
     const point = last?.point_pct ?? 0;
-    const isSale = disc >= 50;
-    const isPoint = !isSale && point >= 50;
-    const priceDir = (prev && price !== prev.price) ? (price < prev.price ? '↓' : '↑') : '';
+    const isSale = disc >= 50, isPoint = !isSale && point >= 50;
+    const priceDir = prev && price !== prev.price ? (price < prev.price ? '↓' : '↑') : '';
+    const dirClass = priceDir === '↓' ? 'dir-down' : priceDir === '↑' ? 'dir-up' : '';
     const sparkKind = isSale ? 'sale' : isPoint ? 'point' : 'normal';
-    const sparkline = buildSparkline(book.history, sparkKind);
-    const badge = isSale ? `<span class="sale-badge">▼${{disc}}%</span>`
-                : isPoint ? `<span class="point-badge">🪙${{point}}%還元</span>` : '';
-    return `<div class="card ${{isSale||isPoint?'on-sale':''}}">
-      <div class="card-header">
-        <div class="book-title"><a href="${{book.url}}" target="_blank" rel="noopener">${{book.title||asin}}</a></div>
+    const badge = isSale ? `<span class="badge sale">▼${{disc}}%</span>`
+                : isPoint ? `<span class="badge point">🪙${{point}}%還元</span>` : '';
+    return `<div class="list-row ${{isSale?'on-sale':isPoint?'on-point':''}}">
+      <div class="row-left">
+        <div class="row-title"><a href="${{book.url}}" target="_blank" rel="noopener">${{book.title||asin}}</a></div>
+        <div class="row-meta">
+          ${{book.query?`<span class="author-tag">${{book.query}}</span>`:''}}
+          ${{last?.date?`<span class="row-date">${{last.date}}</span>`:''}}
+        </div>
+      </div>
+      <div class="row-right">
+        ${{miniSpark(book.history, sparkKind)}}
+        <div class="price-block">
+          <div class="price-current ${{isSale?'sale':isPoint?'point':''}}">
+            ${{price!=null?'¥'+price.toLocaleString():'—'}}${{priceDir?`<span class="${{dirClass}}">${{priceDir}}</span>`:''}}
+          </div>
+          ${{orig&&orig!==price?`<div class="price-orig">¥${{orig.toLocaleString()}}</div>`:''}}
+        </div>
         ${{badge}}
       </div>
-      ${{book.query ? `<span class="author-tag">${{book.query}}</span>` : ''}}
-      <div class="price-row">
-        <span class="price-current ${{isSale?'sale':isPoint?'point':''}}">
-          ${{price!=null?'¥'+price.toLocaleString():'—'}}
-          ${{priceDir?`<span style="font-size:14px;color:${{priceDir==='↓'?'var(--sale)':'#f08080'}}">${{priceDir}}</span>`:''}}
-        </span>
-        ${{orig&&orig!==price?`<span class="price-orig">¥${{orig.toLocaleString()}}</span>`:''}}
-      </div>
-      ${{sparkline?`<div class="sparkline-wrap"><span class="sparkline-label">価格推移（直近${{Math.min(book.history.length,14)}}日）</span>${{sparkline}}</div>`:''}}
-      ${{last?.date?`<div style="font-size:11px;color:var(--muted)">確認: ${{last.date}}</div>`:''}}
     </div>`;
   }}).join('');
 }}
